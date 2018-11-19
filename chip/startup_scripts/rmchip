@@ -1,0 +1,80 @@
+#!/bin/sh
+# chkconfig: 2345 20 80
+# description: Starts Sigma RealMagic chip interface.
+
+if [ -f /etc/init.d/functions ] ; then
+	. /etc/init.d/functions
+elif [ -f /etc/rc.d/init.d/functions ] ; then
+ 	. /etc/rc.d/init.d/functions
+else
+	exit 0
+fi
+
+if [ -f /etc/sysconfig/rmchip ] ; then
+	. /etc/sysconfig/rmchip
+fi
+
+is_mum_installed() {
+	grep > /dev/null mum /proc/devices
+	MUM_INSTALLED=$?
+
+	return $MUM_INSTALLED
+}
+
+insert_mum() {
+	is_mum_installed
+	MUM_INSTALLED=$?
+	if [ "$MUM_INSTALLED" = "0" ] ; then
+		echo "Removing old mum driver..."
+		rmmod mum
+	fi
+
+	modprobe mum
+	MAKEDEV mum
+
+	return
+}
+
+start() {
+	insert_mum
+	KIND="chipinterf"
+	echo -n $"Starting $KIND service: "
+	daemon chipinterf -D
+	RETVAL=$?
+	echo
+	[ $RETVAL -eq 0 ] && touch /var/lock/subsys/rmchip || RETVAL=1
+	return $RETVAL
+}
+
+stop() {
+	KIND="chipinterf"
+	echo -n $"Shutting down $KIND service: "
+	killproc chipinterf
+	RETVAL=$?
+	echo
+	[ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/rmchip
+	return $RETVAL
+}
+
+restart() {
+	stop
+	start
+}
+
+case "$1" in
+	start)
+		start
+		;;
+	stop)
+		stop
+		;;
+	restart)
+		restart
+		;;
+	*)
+		echo $"Usage: $0 {start|stop|restart}"
+		exit 1
+esac
+
+exit $?
+
